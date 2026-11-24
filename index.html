@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>지출의 해부</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div>LEDGER &#8470;01 <span class="dim">/ 2026</span></div>
+    <div class="topbar-step" id="topbar-step">STEP 01/03 &middot; 업로드</div>
+    <div class="dim">READ-ONLY &middot; LOCAL</div>
+  </div>
+
+  <header class="masthead">
+    <h1>지출의 해부</h1>
+    <p class="masthead-en">A Structural Reading Of Your Card Statement</p>
+  </header>
+
+  <!-- Step 1: Upload -->
+  <section id="upload-section" class="split-section">
+    <div class="split-left">
+      <div class="num-row">
+        <div class="num-index">01</div>
+        <div class="num-body">파일은 <strong>이 브라우저 안</strong>에서만 처리됩니다.</div>
+      </div>
+      <div class="num-row">
+        <div class="num-index">02</div>
+        <div class="num-body"><strong>서버로 전송되지</strong> 않습니다.</div>
+      </div>
+      <div class="num-row">
+        <div class="num-index">03</div>
+        <div class="num-body">탭을 닫으면 데이터는 <strong>남지 않습니다</strong>.</div>
+      </div>
+      <p class="body-copy">카드사·은행에서 받은 CSV 내역서를 그대로 올려주세요. 날짜·가맹점·금액 컬럼을 자동으로 찾아 읽습니다.</p>
+    </div>
+    <div class="split-right">
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="CSV 파일을 여기로 드래그하거나 클릭해서 선택하세요">
+        <div class="drop-zone-head">UPLOAD &middot; 업로드</div>
+        <div class="drop-zone-plus">+</div>
+        <p class="drop-zone-main">내역서를 이곳에<br />올려주세요</p>
+        <p class="drop-zone-sub">파일을 끌어다 놓거나, 영역을 눌러서 선택하세요</p>
+        <div class="drop-zone-tags">거래일자&nbsp;&middot;&nbsp;가맹점명&nbsp;&middot;&nbsp;이용금액</div>
+        <input type="file" id="file-input" accept=".csv,text/csv" hidden />
+      </div>
+      <p class="drop-zone-footnote">UTF-8 / EUC-KR 자동 감지 &middot; 테스트용 <code>sample_card_statement.csv</code> 제공</p>
+    </div>
+    <p id="upload-error" class="error-text" hidden></p>
+  </section>
+
+  <!-- Step 2: Column mapping (shown only when auto-detection isn't confident, or on demand) -->
+  <section id="mapping-section" class="flat-section" hidden>
+    <div class="section-head"><b>컬럼 확인</b><span>MAP COLUMNS</span></div>
+    <p class="hint">CSV 헤더를 보고 날짜·가맹점·금액 컬럼을 추정했습니다. 다르면 아래에서 바로 고쳐주세요.</p>
+
+    <div class="mapping-grid">
+      <label>날짜 컬럼 <span class="req">*</span>
+        <select id="map-date"></select>
+      </label>
+      <label>가맹점/내용 컬럼 <span class="req">*</span>
+        <select id="map-merchant"></select>
+      </label>
+      <label>금액 컬럼 <span class="req">*</span>
+        <select id="map-amount"></select>
+      </label>
+      <label>카테고리/업종 컬럼 <span class="opt">(선택, 없으면 자동 분류)</span>
+        <select id="map-category"></select>
+      </label>
+    </div>
+
+    <details class="plain-details">
+      <summary>미리보기 (최대 5행)</summary>
+      <div class="table-scroll">
+        <table id="preview-table" class="data-table"></table>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button id="analyze-btn" class="btn-primary">분석하기</button>
+      <button id="reset-btn" class="btn-ghost">다른 파일 선택</button>
+    </div>
+    <p id="mapping-error" class="error-text" hidden></p>
+  </section>
+
+  <!-- Step 3: Results -->
+  <section id="results-section" hidden>
+
+    <p id="automap-note" class="automap-note" hidden>
+      <span id="automap-text"></span>
+      <button id="remap-btn" type="button" class="link-btn">컬럼 다시 설정</button>
+    </p>
+
+    <div class="num-row-group">
+      <div class="num-row"><div class="num-label">기간<span class="en">PERIOD</span></div><div class="num-value" id="meta-period"></div></div>
+      <div class="num-row"><div class="num-label">거래<span class="en">TRANSACTIONS</span></div><div class="num-value" id="meta-count"></div></div>
+      <div class="num-row"><div class="num-label">분류<span class="en">CATEGORIES</span></div><div class="num-value" id="meta-categories"></div></div>
+      <div class="num-row"><div class="num-label">생성<span class="en">GENERATED</span></div><div class="num-value" id="meta-generated"></div></div>
+    </div>
+
+    <div class="hero-row">
+      <div class="hero-label">총 지출<br /><span class="en">TOTAL</span></div>
+      <div class="hero-value"><span class="won">&#8361;</span><span id="hero-value">0</span></div>
+    </div>
+
+    <div class="stat-strip" id="stat-strip"></div>
+    <p id="skipped-note" class="hint" hidden></p>
+
+    <section class="flat-section">
+      <div class="section-head"><b>카테고리별 지출</b><span>BY CATEGORY</span></div>
+      <div id="category-chart"></div>
+      <details class="plain-details">
+        <summary>표로 보기</summary>
+        <div class="table-scroll">
+          <table id="category-table" class="data-table"></table>
+        </div>
+      </details>
+    </section>
+
+    <section class="flat-section">
+      <div class="section-head"><b>상위 가맹점</b><span>TOP MERCHANTS</span></div>
+      <div id="merchant-chart"></div>
+      <details class="plain-details">
+        <summary>표로 보기</summary>
+        <div class="table-scroll">
+          <table id="merchant-table" class="data-table"></table>
+        </div>
+      </details>
+    </section>
+
+    <section class="flat-section">
+      <div class="section-head"><b>월별 지출 추이</b><span>MONTHLY TREND</span></div>
+      <div id="monthly-chart"></div>
+      <details class="plain-details">
+        <summary>표로 보기</summary>
+        <div class="table-scroll">
+          <table id="monthly-table" class="data-table"></table>
+        </div>
+      </details>
+    </section>
+
+    <section class="flat-section">
+      <div class="section-head"><b>고액 결제</b><span>LARGEST PAYMENTS</span></div>
+      <div class="table-scroll">
+        <table id="top-tx-table" class="data-table"></table>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="reset-btn-2" class="btn-ghost">다른 파일 분석하기</button>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    모든 파싱과 계산은 이 브라우저 탭 안에서만 실행됩니다 &middot; 서버로 업로드되지 않습니다
+  </footer>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
